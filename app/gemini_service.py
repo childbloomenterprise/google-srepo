@@ -1,6 +1,7 @@
 import json
 import mimetypes
 import os
+import re
 import time
 from pathlib import Path
 from typing import Any
@@ -11,6 +12,16 @@ from google.genai import types
 from app.models import Letters, Verdict, VoiceResult
 from app.rules import load_rulebook
 
+DEFAULT_ANALYSIS_CHAIN = (
+    "gemini-4-argon,gemini-3.8-flash,gemini-3.6-flash,"
+    "gemini-3-flash-preview,gemini-3.5-flash,gemini-3.1-flash-lite"
+)
+DEFAULT_FAST_CHAIN = (
+    "gemini-3.8-flash,gemini-3.6-flash,gemini-3-flash-preview,gemini-3.1-flash-lite"
+)
+QUARANTINE_TTL_SECONDS = 10 * 60
+_QUARANTINED_MODELS: dict[str, float] = {}
+
 ANALYSIS_PROMPT = """Review the supplied Indian health-insurance policy, hospital records, and
 insurer decision. Return the requested structured verdict.
 
@@ -18,9 +29,21 @@ Use only rules in the rulebook. Quote evidence verbatim from the supplied docume
 refusal VALID when it is genuinely supported, such as a real exclusion or real non-disclosure
 within 60 months. Never suggest hiding facts. Always fill amounts in INR. Do not invent facts,
 policy clauses, dates, or evidence. If a fact is unavailable, use null or add it to missing_info.
-For each refusal, only cite a rule when the uploaded documents support that rule's applicability.
-Keep each plain-language explanation to no more than two simple sentences. The policyholder may
-have a STRONG/WEAK case; assess fairly and do not assume every deduction is wrongful.
+Evaluate every distinct refused or deducted line item separately. Different reasons applied to the
+same denied charge are grounds for one refusal, not duplicate monetary items: combine the supported
+reasons and rule IDs, count that denied amount only once, and never make refusal amounts exceed the
+unique denied amount. Keep genuinely separate deductions as separate items.
+For a room-rent proportionate deduction, check each item under R06: it is never allowed on pharmacy
+or consumables, implants or medical devices, diagnostics, or ICU charges, and is not allowed when
+the hospital does not use differential room-based billing for that item. Do not cite R11 based only
+on the insurer calling a condition pre-existing; the documents must give a diagnosis or treatment
+date that can be compared with the first policy start. If no such date is documented, or records
+say no diagnosis or treatment is recorded, omit R11. For non-disclosure after at least 60 months of
+continuous cover, assess the allegation under R01. For each refusal, only cite rules the uploaded
+documents support.
+Keep each plain-language explanation to no more than two simple sentences. The policyholder may have
+a STRONG/WEAK case; assess fairly and do not assume every deduction is wrongful.
+Return all dates as YYYY-MM-DD, converting the document's displayed date format as needed.
 """
 
 
@@ -41,40 +64,79 @@ class GeminiService:
             self._client = genai.Client(api_key=api_key)
         return self._client
 
+    @staticmethod
+    def _status_code(exc: Exception) -> int | None:
+        code = getattr(exc, "code", None)
+        try:
+            if code is not None:
+                return int(code)
+        except (TypeError, ValueError):
+            pass
+        match = re.match(r"^\s*(\d{3})\b", str(exc))
+        return int(match.group(1)) if match else None
+
+    @staticmethod
+    def _model_chain(chain_env: str, default: str, legacy_env: str) -> list[str]:
+        configured = os.getenv(chain_env, default)
+        models = [model.strip() for model in configured.split(",") if model.strip()]
+        legacy_model = os.getenv(legacy_env, "").strip()
+        if legacy_model:
+            models.insert(0, legacy_model)
+        return list(dict.fromkeys(models))
+
+    @staticmethod
+    def _is_quarantined(model: str) -> bool:
+        expires_at = _QUARANTINED_MODELS.get(model)
+        if expires_at is None:
+            return False
+        if expires_at > time.monotonic():
+            return True
+        del _QUARANTINED_MODELS[model]
+        return False
+
     def _generate(
         self,
         *,
         contents: list[Any],
         schema: type,
         system_instruction: str,
-        preferred_model: str,
-        fallback: bool = False,
-    ) -> Any:
+        chain_env: str,
+        default_chain: str,
+        legacy_env: str,
+    ) -> tuple[Any, str]:
         config = types.GenerateContentConfig(
             system_instruction=system_instruction,
             response_mime_type="application/json",
             response_schema=schema,
         )
-
-        def generate_with_retry(model: str) -> Any:
+        models = self._model_chain(chain_env, default_chain, legacy_env)
+        last_error: Exception | None = None
+        for model in models:
+            if self._is_quarantined(model):
+                continue
             for attempt in range(2):
                 try:
-                    return self.client.models.generate_content(
+                    response = self.client.models.generate_content(
                         model=model, contents=contents, config=config
                     )
+                    return response, model
                 except Exception as exc:
-                    status = str(exc).lstrip().split(maxsplit=1)[0].rstrip(":")
-                    if attempt or status not in {"429", "500", "502", "503", "504"}:
-                        raise
-                    time.sleep(1)
-
-        try:
-            return generate_with_retry(preferred_model)
-        except Exception:
-            fallback_model = os.getenv("CB_MODEL_FAST", "gemini-3.8-flash")
-            if not fallback or preferred_model == fallback_model:
-                raise
-            return generate_with_retry(fallback_model)
+                    last_error = exc
+                    status = self._status_code(exc)
+                    if status == 429:
+                        _QUARANTINED_MODELS[model] = (
+                            time.monotonic() + QUARANTINE_TTL_SECONDS
+                        )
+                        break
+                    if status == 404:
+                        break
+                    if status in {500, 502, 503, 504} and attempt == 0:
+                        time.sleep(2)
+                        continue
+                    break
+        if last_error is not None:
+            raise last_error
+        raise RuntimeError("No configured Gemini models are currently available")
 
     @staticmethod
     def _parse_response(response: Any, schema: type) -> Any:
@@ -86,7 +148,9 @@ class GeminiService:
             raise ValueError("Gemini returned no structured response")
         return schema.model_validate(json.loads(text))
 
-    def analyze(self, documents: list[tuple[str, bytes]], notes: str = "") -> Verdict:
+    def analyze(
+        self, documents: list[tuple[str, bytes]], notes: str = ""
+    ) -> tuple[Verdict, str]:
         contents: list[Any] = []
         for filename, data in documents:
             mime_type = mimetypes.guess_type(filename)[0] or "application/octet-stream"
@@ -97,16 +161,17 @@ class GeminiService:
             + "\n\nExtract the case facts and assess each distinct refused or deducted item."
         )
         system_instruction = f"{ANALYSIS_PROMPT}\n\nCURATED IRDAI RULEBOOK:\n{load_rulebook()}"
-        response = self._generate(
+        response, model_used = self._generate(
             contents=contents,
             schema=Verdict,
             system_instruction=system_instruction,
-            preferred_model=os.getenv("CB_MODEL_ANALYSIS", "gemini-4-argon"),
-            fallback=True,
+            chain_env="CB_MODEL_CHAIN_ANALYSIS",
+            default_chain=DEFAULT_ANALYSIS_CHAIN,
+            legacy_env="CB_MODEL_ANALYSIS",
         )
-        return self._parse_response(response, Verdict)
+        return self._parse_response(response, Verdict), model_used
 
-    def generate_letters(self, case: dict[str, Any]) -> Letters:
+    def generate_letters(self, case: dict[str, Any]) -> tuple[Letters, str]:
         allowed_rules = sorted(
             {
                 rule_id
@@ -129,20 +194,21 @@ placeholder rather than inventing one. State that the draft is for the policyhol
 Case facts and verified findings:
 {json.dumps(case, ensure_ascii=False)}
 """
-        response = self._generate(
+        response, model_used = self._generate(
             contents=[prompt],
             schema=Letters,
             system_instruction=(
                 "You draft accurate first-person insurance grievance documents. Do not add "
                 "unverified facts, legal advice, or legal representation claims."
             ),
-            preferred_model=os.getenv("CB_MODEL_ANALYSIS", "gemini-4-argon"),
-            fallback=True,
+            chain_env="CB_MODEL_CHAIN_ANALYSIS",
+            default_chain=DEFAULT_ANALYSIS_CHAIN,
+            legacy_env="CB_MODEL_ANALYSIS",
         )
-        return self._parse_response(response, Letters)
+        return self._parse_response(response, Letters), model_used
 
-    def transcribe(self, data: bytes, mime_type: str) -> VoiceResult:
-        response = self._generate(
+    def transcribe(self, data: bytes, mime_type: str) -> tuple[VoiceResult, str]:
+        response, model_used = self._generate(
             contents=[
                 types.Part.from_bytes(data=data, mime_type=mime_type),
                 "Transcribe the speaker in Hindi or English as spoken, then extract the available "
@@ -152,6 +218,8 @@ Case facts and verified findings:
             system_instruction=(
                 "Accurately transcribe policyholder voice messages and extract only stated facts."
             ),
-            preferred_model=os.getenv("CB_MODEL_FAST", "gemini-3.8-flash"),
+            chain_env="CB_MODEL_CHAIN_FAST",
+            default_chain=DEFAULT_FAST_CHAIN,
+            legacy_env="CB_MODEL_FAST",
         )
-        return self._parse_response(response, VoiceResult)
+        return self._parse_response(response, VoiceResult), model_used

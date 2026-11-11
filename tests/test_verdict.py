@@ -95,5 +95,6 @@ def test_dates_are_optional_but_present_dates_must_be_iso_formatted():
     assert Verdict.model_validate(
         {"policyholder_name": None, "insurer": None, "policy_number": None}
     ).admission_date is None
+    assert base_verdict(admission_date="18 Aug 2026").admission_date == "2026-08-18"
     with pytest.raises(ValueError, match="YYYY-MM-DD"):
-        base_verdict(admission_date="20/08/2026")
+        base_verdict(admission_date="not a date")

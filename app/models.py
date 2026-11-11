@@ -1,5 +1,5 @@
-from datetime import date
-from typing import Literal
+from datetime import date, datetime
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -39,17 +39,32 @@ class Verdict(BaseModel):
         "discharge_date",
         "decision_date",
         "claim_submitted_date",
+        mode="before",
     )
     @classmethod
-    def validate_iso_date(cls, value: str | None) -> str | None:
-        if value is not None:
-            try:
-                parsed = date.fromisoformat(value)
-            except ValueError as exc:
-                raise ValueError("Dates must use YYYY-MM-DD format") from exc
-            if parsed.isoformat() != value:
-                raise ValueError("Dates must use YYYY-MM-DD format")
-        return value
+    def validate_iso_date(cls, value: Any) -> str | None:
+        if value is None or value == "":
+            return None
+        if not isinstance(value, str):
+            raise ValueError("Dates must use YYYY-MM-DD format")
+        try:
+            return date.fromisoformat(value).isoformat()
+        except ValueError:
+            formats = (
+                "%d %B %Y",
+                "%d %b %Y",
+                "%B %d, %Y",
+                "%b %d, %Y",
+                "%d/%m/%Y",
+                "%d-%m-%Y",
+                "%Y/%m/%d",
+            )
+            for date_format in formats:
+                try:
+                    return datetime.strptime(value, date_format).date().isoformat()
+                except ValueError:
+                    continue
+        raise ValueError("Dates must use YYYY-MM-DD format")
 
 
 class Letters(BaseModel):

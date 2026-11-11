@@ -1,0 +1,89 @@
+{
+  "policyholder_name": "Asha Kulkarni",
+  "insurer": "SURAKSHA HEALTH INSURANCE CO. LTD.",
+  "policy_number": "SHI-DEMO-2018-0421",
+  "hospital": "SUNRISE MULTISPECIALITY HOSPITAL, PUNE",
+  "policy_first_start_date": "2018-04-01",
+  "admission_date": "2026-08-18",
+  "discharge_date": "2026-08-22",
+  "decision_date": "2026-10-10",
+  "claim_submitted_date": "2026-09-02",
+  "continuous_cover_months": 100,
+  "claim_type": "reimbursement",
+  "amount_claimed": 218450.0,
+  "amount_paid": 162950.0,
+  "amount_refused": 55500.0,
+  "refusals": [
+    {
+      "item": "Proportionate deduction 30% — pharmacy & consumables",
+      "amount": 21600.0,
+      "insurer_reason": "Proportionate deduction 30% — pharmacy & consumables ₹21,600",
+      "verdict": "WRONGFUL",
+      "rule_ids": [
+        "R06"
+      ],
+      "why_simple_en": "Proportionate deduction cannot be applied to pharmacy and consumables regardless of the room category chosen.",
+      "why_simple_hi": "कमरे की श्रेणी के आधार पर दवाइयों और उपभोग्य सामग्रियों (फार्मेसी और कंज्यूमेबल्स) पर आनुपातिक कटौती लागू नहीं की जा सकती।",
+      "evidence_quote": "Proportionate deduction 30% — pharmacy & consumables ₹21,600"
+    },
+    {
+      "item": "Proportionate deduction 30% — diagnostics",
+      "amount": 9300.0,
+      "insurer_reason": "Proportionate deduction 30% — diagnostics ₹9,300",
+      "verdict": "WRONGFUL",
+      "rule_ids": [
+        "R06"
+      ],
+      "why_simple_en": "Proportionate deduction is not allowed on diagnostic and laboratory tests.",
+      "why_simple_hi": "डायग्नोस्टिक्स और लैब जांच के खर्चों पर आनुपातिक कटौती लागू नहीं की जा सकती।",
+      "evidence_quote": "Proportionate deduction 30% — diagnostics ₹9,300"
+    },
+    {
+      "item": "Proportionate deduction 30% — ICU charges",
+      "amount": 7200.0,
+      "insurer_reason": "Proportionate deduction 30% — ICU charges ₹7,200",
+      "verdict": "WRONGFUL",
+      "rule_ids": [
+        "R06"
+      ],
+      "why_simple_en": "IRDAI guidelines strictly prohibit applying proportionate deduction to ICU charges.",
+      "why_simple_hi": "आईसीयू (ICU) के खर्चों पर आनुपातिक कटौती लागू करना IRDAI के नियमों के खिलाफ है।",
+      "evidence_quote": "Proportionate deduction 30% — ICU charges ₹7,200"
+    },
+    {
+      "item": "Proportionate deduction 30% — room-associated surgeon",
+      "amount": 6000.0,
+      "insurer_reason": "Proportionate deduction 30% — room-associated surgeon ₹6,000",
+      "verdict": "VALID",
+      "rule_ids": [],
+      "why_simple_en": "Surgeon fees that vary by room category are defined associate medical expenses eligible for proportionate deduction.",
+      "why_simple_hi": "कमरे की श्रेणी के अनुसार बदलने वाली सर्जन फीस पर आनुपातिक कटौती वैध है।",
+      "evidence_quote": "Proportionate deduction 30% — room-associated surgeon ₹6,000"
+    },
+    {
+      "item": "Non-medical items (items billed inside OT package)",
+      "amount": 4800.0,
+      "insurer_reason": "Non-medical items (items billed inside OT package) ₹4,800",
+      "verdict": "WRONGFUL",
+      "rule_ids": [
+        "R12"
+      ],
+      "why_simple_en": "Consumables and items billed within an OT package cannot be deducted separately as non-medical expenses.",
+      "why_simple_hi": "ओटी पैकेज के अंदर शामिल मदों को गैर-चिकित्सा खर्च बताकर अलग से काटा नहीं जा सकता।",
+      "evidence_quote": "Non-medical items (items billed inside OT package) ₹4,800"
+    },
+    {
+      "item": "Room rent excess above eligible category",
+      "amount": 6600.0,
+      "insurer_reason": "Room rent excess above eligible category ₹6,600",
+      "verdict": "VALID",
+      "rule_ids": [],
+      "why_simple_en": "The policyholder opted for a single room while being eligible for a twin-sharing room, making the excess room rent non-payable.",
+      "why_simple_hi": "पॉलिसी के तहत ट्विन-शेयरिंग कमरा पात्र था, इसलिए सिंगल कमरे का अतिरिक्त किराया काटना वैध है।",
+      "evidence_quote": "Room rent excess above eligible category ₹6,600"
+    }
+  ],
+  "missing_info": [],
+  "model_used": "gemini-3.6-flash",
+  "cached_at": "2026-11-11T13:26:53.281598+00:00"
+}

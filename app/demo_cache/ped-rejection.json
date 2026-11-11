@@ -1,0 +1,37 @@
+{
+  "policyholder_name": "Kabir Deshmukh",
+  "insurer": "SURAKSHA HEALTH INSURANCE CO. LTD.",
+  "policy_number": "SHI-DEMO-2019-0615",
+  "hospital": "SUNRISE MULTISPECIALITY HOSPITAL, PUNE",
+  "policy_first_start_date": "2019-06-15",
+  "admission_date": "2026-08-20",
+  "discharge_date": "2026-08-24",
+  "decision_date": "2026-09-05",
+  "claim_submitted_date": null,
+  "continuous_cover_months": 86,
+  "claim_type": "reimbursement",
+  "amount_claimed": 340000.0,
+  "amount_paid": 0.0,
+  "amount_refused": 340000.0,
+  "refusals": [
+    {
+      "item": "Total Submitted Claim Amount",
+      "amount": 340000.0,
+      "insurer_reason": "Your claim is rejected for non-disclosure of pre-existing diabetes. The claim is also not admissible due to delayed intimation.",
+      "verdict": "WRONGFUL",
+      "rule_ids": [
+        "R01",
+        "R02",
+        "R05"
+      ],
+      "why_simple_en": "The policy has completed over 60 continuous months of cover, making non-disclosure non-contestable under IRDAI moratorium rules. Furthermore, delayed intimation cannot be a sole ground for rejection, and the insurer failed to cite specific policy clauses or committee approvals.",
+      "why_simple_hi": "नीति 60 महीनों से अधिक समय से लगातार चालू है, इसलिए आईआरडीएआई के नियमों के तहत पुरानी बीमारी छुपाने के आधार पर दावा खारिज नहीं किया जा सकता। इसके अलावा केवल देरी से सूचना देने पर दावा रद्द नहीं हो सकता और कंपनी ने कोई विशिष्ट नियम या समिति की मंजूरी दर्ज नहीं की है।",
+      "evidence_quote": "Your claim is rejected for non-disclosure of pre-existing diabetes. The claim is also not admissible due to delayed intimation."
+    }
+  ],
+  "missing_info": [
+    "claim_submitted_date"
+  ],
+  "model_used": "gemini-3.6-flash",
+  "cached_at": "2026-11-11T13:29:32.876689+00:00"
+}

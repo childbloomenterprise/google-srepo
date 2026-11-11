@@ -16,9 +16,11 @@ uvicorn app.main:app --reload --port 8080
 ```
 
 During development only, the app can read `/home/ubuntu/.gemini_key` when `GEMINI_API_KEY` is not
-set. Do not place keys in source control. `CB_MODEL_ANALYSIS` and `CB_MODEL_FAST` configure the
-analysis/letters and extraction/voice models respectively. Defaults are `gemini-4-argon` and
-`gemini-3.8-flash`; analysis retries with the fast model if the analysis model errors.
+set. Do not place keys in source control. `CB_MODEL_CHAIN_ANALYSIS` and `CB_MODEL_CHAIN_FAST`
+configure comma-separated model chains for analysis/letters and voice respectively. The existing
+`CB_MODEL_ANALYSIS` and `CB_MODEL_FAST` settings remain supported and are prepended to their
+respective chains. Models that return HTTP 429 are skipped for ten minutes in that process;
+transient 5xx responses are retried once before moving to the next model.
 
 SQLite is the default store at `data/claimback.db`. Set `CB_DB_PATH` to use a different file. Set
 `CB_STORE=firestore` to select the optional Firestore-backed adapter (requires Google Cloud
@@ -34,7 +36,9 @@ ruff check app
 
 The demo documents are synthetic and visibly labelled. The `/api/demo/partial-cut` and
 `/api/demo/ped-rejection` endpoints call Gemini on those documents; they do not return canned
-verdicts. `/dashboard` summarizes stored prototype cases and labels the future BigQuery export.
+verdicts. Successful live demo verdicts are saved under `app/demo_cache/`; if Gemini is
+unavailable, only the demo endpoints can show that explicitly labelled saved live result.
+`/dashboard` summarizes stored prototype cases and labels the future BigQuery export.
 
 ## Deploy to Cloud Run
 
